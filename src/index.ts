@@ -1,1 +1,1 @@
-export { default } from './OmniLogic';
+export { default } from './OmniLogicAPI.js';

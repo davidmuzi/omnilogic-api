@@ -17,8 +17,6 @@ export async function sendRequest(payload: { Request: any }): Promise<any> {
     const parser = new XMLParser(xmlOptions);
     return parser.parse(xml);
   } catch (error: unknown) {
-    console.error('error: ', error);
-
     if (typeof error === 'string') {
       throw new Error(error);
     } else if (error instanceof Error) {

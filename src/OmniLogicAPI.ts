@@ -1,14 +1,11 @@
-import { StatusResponse } from './TelemetryResponse';
-import { sendRequest } from './sendRequest';
-import { parseTelemetryData } from './parseTelemetryData';
+import { StatusResponse } from './TelemetryResponse.js';
+import { sendRequest } from './sendRequest.js';
+import { parseTelemetryData } from './parseTelemetryData.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 class OmniLogic {
-  constructor() {
-    // Initialize any required properties
-  }
 
   async getPumpSpeed(): Promise<number> {
     const { filters } = await this.requestTelemetryData();
