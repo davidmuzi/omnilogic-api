@@ -1,9 +1,9 @@
-type Token = {
+export type Token = {
   token: string;
   refreshToken: string;
 };
 
-type Session = Token & {
+export type Session = Token & {
   userID: number;
   email: string;
   firstName: string;
@@ -14,21 +14,6 @@ export class OmniLogicAuth {
   private static baseURL = "https://services-gamma.haywardcloud.net/auth-service/v2/";
   private static jsonHeader = { "Content-Type": "application/json" };
   private static apiHeader = { "X-Hayward-App-Id": "6jf6n7jt9fqqe9qkbutaqajl2i" };
-
-  // startRefreshTokenTimer() {
-  //   // refresh the token every 24 hours
-  //   setInterval(async () => {
-  //     logger.debug("Refreshing token...");
-  //     const response = await this.refreshToken();
-
-  //     if (response instanceof Error || this.session == null) {
-  //       return;
-  //     }
-  //     this.session = { userID: this.session.userID, ...response };
-  //     setToken(response.token);
-  //     logger.debug("Token refreshed!");
-  //   }, /*24*/ 6 * 60 * 60 * 1000);
-  // }
 
   async login(email: string, password: string): Promise<Session | Error> {
     const method = "POST";

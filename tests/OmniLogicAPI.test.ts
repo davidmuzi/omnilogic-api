@@ -1,10 +1,16 @@
 import OmniLogic from '../src/index.js';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 describe('OmniLogic', () => {
   let omniLogic: OmniLogic;
-
   beforeEach(() => {
-    omniLogic = new OmniLogic();
+    const token = {
+      token: process.env.OMNILOGIC_TOKEN!,
+      refreshToken: "1234567890"
+    }
+    omniLogic = OmniLogic.withToken(token);
   });
 
   describe('status', () => {

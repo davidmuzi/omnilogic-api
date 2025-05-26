@@ -1,11 +1,43 @@
 import { StatusResponse } from './TelemetryResponse.js';
 import { sendRequest } from './sendRequest.js';
 import { parseTelemetryData } from './parseTelemetryData.js';
+import { OmniLogicAuth, type Token } from './Authentication.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 class OmniLogic {
+  private auth: OmniLogicAuth;
+  private token: Token | null = null;
+
+  private constructor(auth: OmniLogicAuth) {
+    this.auth = auth;
+  }
+
+  static async withCredentials(email: string, password: string): Promise<OmniLogic | Error> {
+    const auth = new OmniLogicAuth();
+    const result = await auth.login(email, password);
+    
+    if (result instanceof Error) {
+      return result;
+    }
+
+    const client = new OmniLogic(auth);
+    client.token = result;
+  
+    return client;
+  }
+
+  static withToken(token: Token): OmniLogic {
+    const auth = new OmniLogicAuth();
+    const client = new OmniLogic(auth);
+    client.token = token;
+
+    // check if token is valid
+    // setup token refresh
+
+    return client;
+  }
 
   async getPumpSpeed(): Promise<number> {
     const { filters } = await this.requestTelemetryData();
@@ -84,11 +116,14 @@ class OmniLogic {
   }
 
   protected systemTag() {
-    return this.tag('MspSystemID', process.env.MSP_SYSTEM_ID);
+    return this.tag('MspSystemID', process.env.MSP_SYSTEM_ID); // TODO: get these from telemetry api
   }
 
   protected tokenTag() {
-    return this.tag('token', process.env.OMNILOGIC_TOKEN);
+    if (!this.token) {
+      throw new Error('No valid token available');
+    }
+    return this.tag('token', this.token.token);
   }
 
   protected tag<T>(name: string, value: T) {
@@ -101,7 +136,7 @@ class OmniLogic {
     } else if (typeof value === 'boolean') {
       _dataType = 'bool';
     } else {
-      throw new Error('Unsupported data type');
+      throw new Error(`Unsupported data type: ${typeof value}`, );
     }
 
     return { '@_name': name, '@_dataType': _dataType, '#text': value };
