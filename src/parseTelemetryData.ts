@@ -1,4 +1,4 @@
-import { StatusResponse } from './TelemetryResponse';
+import { StatusResponse, MSPListResponse } from './TelemetryResponse';
 
 function ensureArray<T>(value: T | T[]): T[] {
   return Array.isArray(value) ? value : [value];
@@ -79,5 +79,22 @@ export function parseTelemetryData({ STATUS: status }: { STATUS: any }): StatusR
       systemId: parseInt(group['@_systemId']),
       groupState: parseInt(group['@_groupState']),
     })),
+  };
+}
+
+export function parseMSPList(response: any): MSPListResponse {
+  const parameters = ensureArray(response.Response.Parameters.Parameter);
+  const list = ensureArray(parameters[2].Item);
+  
+  return {
+    status: parseInt(parameters[0]['#text']),
+    statusMessage: parameters[1]['#text'],
+    list: list.map(item => ({
+      mspSystemId: parseInt(item.Property[0]['#text']),
+      backyardName: item.Property[1]['#text'],
+      address: item.Property[2]['#text'],
+      messageVersion: item.Property[3]['#text'],
+      needShowPopupMessage: item.Property[4]['#text'].toLowerCase() === 'true'
+    }))
   };
 }

@@ -1,14 +1,13 @@
-import { StatusResponse } from './TelemetryResponse.js';
+import type { StatusResponse, ColorLogicLightStatus as Light } from './TelemetryResponse.js';
 import { sendRequest } from './sendRequest.js';
-import { parseTelemetryData } from './parseTelemetryData.js';
+import { parseTelemetryData, parseMSPList } from './parseTelemetryData.js';
 import { OmniLogicAuth, type Token } from './Authentication.js';
-import dotenv from 'dotenv';
-
-dotenv.config();
 
 class OmniLogic {
   private auth: OmniLogicAuth;
   private token: Token | null = null;
+  private userID: number | null = null;
+  private systemID: number | null = null;
 
   private constructor(auth: OmniLogicAuth) {
     this.auth = auth;
@@ -24,19 +23,26 @@ class OmniLogic {
 
     const client = new OmniLogic(auth);
     client.token = result;
-  
+    client.userID = result.userID;
+
     return client;
   }
 
-  static withToken(token: Token): OmniLogic {
+  static withToken(token: Token, userID: number): OmniLogic {
     const auth = new OmniLogicAuth();
     const client = new OmniLogic(auth);
     client.token = token;
+    client.userID = userID;
 
     // check if token is valid
     // setup token refresh
 
     return client;
+  }
+
+  async connect() {
+    const mspList = await this.requestMSPList();
+    this.systemID = mspList.list[0].mspSystemId;
   }
 
   async getPumpSpeed(): Promise<number> {
@@ -71,13 +77,13 @@ class OmniLogic {
     throw new Error('unable to get water temperature');
   }
 
-  async getLightState(): Promise<boolean> {
+  async getLightState(light: Light): Promise<boolean> {
     const { colorLogicLights } = await this.requestTelemetryData();
     // 0: off, 4: powering on, 6: on 7: powering off,
-    return colorLogicLights.some(light => light.lightState === 6);
+    return colorLogicLights.filter(l => l.systemId == light.systemId)[0]?.lightState == 6
   }
 
-  async setLightState(on: boolean): Promise<boolean> {
+  async setLightState(light: Light, on: boolean): Promise<boolean> {
     const isOn = on === true ? 1 : 0;
 
     const payload = {
@@ -87,8 +93,8 @@ class OmniLogic {
           Parameter: [
             this.tokenTag(),
             this.systemTag(),
-            this.tag('PoolID', process.env.POOL_ID),
-            this.tag('EquipmentId', process.env.LIGHT_ID),
+            this.poolIdTag(),
+            this.tag('EquipmentId', light.systemId),
             this.tag('IsOn', isOn),
             ...this.emptyTimerTag(),
           ],
@@ -110,13 +116,40 @@ class OmniLogic {
         },
       },
     };
-
     const data = await sendRequest(payload);
     return parseTelemetryData(data);
   }
 
+  protected async requestMSPList() {
+    const payload = {
+      Request: {
+        Name: `GetMspList`,
+        Parameters: {
+          Parameter: [this.tokenTag(), this.userTag()],
+        },
+      },
+    };
+    const data = await sendRequest(payload);
+    return parseMSPList(data);
+  }
+
   protected systemTag() {
-    return this.tag('MspSystemID', process.env.MSP_SYSTEM_ID); // TODO: get these from telemetry api
+    if (!this.systemID) {
+      throw new Error('No telemetry data available');
+    }
+
+    return this.tag('MspSystemID', this.systemID);
+  }
+
+  protected poolIdTag() {
+    return this.tag('PoolID', 1 /* 2 for spa?*/);
+  }
+
+  protected userTag() {
+    if (!this.userID) {
+      throw new Error('No user ID available');
+    }
+    return this.tag('OwnerID', this.userID);
   }
 
   protected tokenTag() {

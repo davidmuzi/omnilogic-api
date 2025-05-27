@@ -91,3 +91,17 @@ export interface GroupStatus {
   systemId: number;
   groupState: number;
 }
+
+export interface MSPListResponse {
+  status: number;
+  statusMessage: string;
+  list: MSPItem[];
+}
+
+export interface MSPItem {
+  mspSystemId: number;
+  backyardName: string;
+  address: string;
+  messageVersion: string;
+  needShowPopupMessage: boolean;
+}
