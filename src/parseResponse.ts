@@ -1,4 +1,4 @@
-import { StatusResponse, MSPListResponse } from './TelemetryResponse';
+import { StatusResponse, MSPListResponse } from './Response';
 
 function ensureArray<T>(value: T | T[]): T[] {
   return Array.isArray(value) ? value : [value];

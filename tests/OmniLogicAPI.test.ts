@@ -1,6 +1,6 @@
 import OmniLogic from '../src/index.js';
 import dotenv from 'dotenv';
-import { ColorLogicLightStatus } from '../src/TelemetryResponse.js';
+import { ColorLogicLightStatus } from '../src/Response.js';
 
 dotenv.config();
 

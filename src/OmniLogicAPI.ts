@@ -1,7 +1,8 @@
-import type { StatusResponse, ColorLogicLightStatus as Light } from './TelemetryResponse.js';
+import { StatusResponse } from './Response.js';
 import { sendRequest } from './sendRequest.js';
-import { parseTelemetryData, parseMSPList } from './parseTelemetryData.js';
+import { parseTelemetryData, parseMSPList } from './parseResponse.js';
 import { OmniLogicAuth, type Token } from './Authentication.js';
+import type { ColorLogicLightStatus as Light } from './Response.js';
 
 class OmniLogic {
   private auth: OmniLogicAuth;
