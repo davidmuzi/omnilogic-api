@@ -17,6 +17,10 @@ describe('OmniLogic', () => {
     await omniLogic.connect();
   });
 
+  afterEach(() => {
+    omniLogic.clearTokenRefresh();
+  });
+
   describe('status', () => {
 
     const mockLight: ColorLogicLightStatus = { 

@@ -3,12 +3,14 @@ import { sendRequest } from './sendRequest.js';
 import { parseTelemetryData, parseMSPList } from './parseResponse.js';
 import { OmniLogicAuth, type Token } from './Authentication.js';
 import type { ColorLogicLightStatus as Light } from './Response.js';
+import { jwtDecode } from 'jwt-decode';
 
 class OmniLogic {
   private auth: OmniLogicAuth;
   private token: Token | null = null;
   private userID: number | null = null;
   private systemID: number | null = null;
+  private refreshInterval: NodeJS.Timeout | null = null;
 
   private constructor(auth: OmniLogicAuth) {
     this.auth = auth;
@@ -17,7 +19,7 @@ class OmniLogic {
   static async withCredentials(email: string, password: string): Promise<OmniLogic | Error> {
     const auth = new OmniLogicAuth();
     const result = await auth.login(email, password);
-    
+
     if (result instanceof Error) {
       return result;
     }
@@ -25,6 +27,7 @@ class OmniLogic {
     const client = new OmniLogic(auth);
     client.token = result;
     client.userID = result.userID;
+    client.setupTokenRefresh()
 
     return client;
   }
@@ -35,10 +38,61 @@ class OmniLogic {
     client.token = token;
     client.userID = userID;
 
-    // check if token is valid
-    // setup token refresh
+    client.setupTokenRefresh()
 
     return client;
+  }
+
+  setupTokenRefresh() {
+    if (this.token === null) {
+      throw new Error('No valid token available');
+    }
+
+    // Clear any existing interval
+    this.clearTokenRefresh();
+
+    // Set new interval
+    this.refreshInterval = setInterval(() => this.refreshTokenIfNeeded(), 1000 * 60 * 60); // Check every hour
+  }
+
+  clearTokenRefresh() {
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
+      this.refreshInterval = null;
+    }
+  }
+
+  async refreshTokenIfNeeded() {
+    if (this.token === null) {
+      throw new Error('No valid token available');
+    }
+
+    try {
+      const decoded = jwtDecode(this.token.token);
+      const exp = (decoded as { exp?: number }).exp;
+      
+      if (!exp) {
+        throw new Error('Token does not contain expiration');
+      }
+
+      const expiresAt = exp * 1000; // Convert to milliseconds
+      const now = Date.now();
+      const timeUntilExpiry = expiresAt - now;
+
+      // Refresh if token expires in less than 24 hours
+      if (timeUntilExpiry < 1000 * 60 * 60 * 24) {
+        console.log('Token close to expiring, refreshing...');
+        const newToken = await this.auth.refreshToken(this.token);
+        if (newToken instanceof Error) {
+          throw new Error('Failed to refresh token');
+        }
+        this.token = newToken;
+        console.log('Token refreshed');
+      }
+    } catch (error) {
+      console.error('Error checking/refreshing token:', error);
+      throw error;
+    }
   }
 
   async connect() {
@@ -81,7 +135,7 @@ class OmniLogic {
   async getLightState(light: Light): Promise<boolean> {
     const { colorLogicLights } = await this.requestTelemetryData();
     // 0: off, 4: powering on, 6: on 7: powering off,
-    return colorLogicLights.filter(l => l.systemId == light.systemId)[0]?.lightState == 6
+    return colorLogicLights.filter(l => l.systemId == light.systemId)[0]?.lightState == 6;
   }
 
   async setLightState(light: Light, on: boolean): Promise<boolean> {
@@ -170,7 +224,7 @@ class OmniLogic {
     } else if (typeof value === 'boolean') {
       _dataType = 'bool';
     } else {
-      throw new Error(`Unsupported data type: ${typeof value}`, );
+      throw new Error(`Unsupported data type: ${typeof value}`);
     }
 
     return { '@_name': name, '@_dataType': _dataType, '#text': value };
