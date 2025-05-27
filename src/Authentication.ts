@@ -11,12 +11,12 @@ export type Session = Token & {
 };
 
 export class OmniLogicAuth {
-  private static baseURL = "https://services-gamma.haywardcloud.net/auth-service/v2/";
-  private static jsonHeader = { "Content-Type": "application/json" };
-  private static apiHeader = { "X-Hayward-App-Id": "6jf6n7jt9fqqe9qkbutaqajl2i" };
+  private static baseURL = 'https://services-gamma.haywardcloud.net/auth-service/v2/';
+  private static jsonHeader = { 'Content-Type': 'application/json' };
+  private static apiHeader = { 'X-Hayward-App-Id': '6jf6n7jt9fqqe9qkbutaqajl2i' };
 
   async login(email: string, password: string): Promise<Session | Error> {
-    const method = "POST";
+    const method = 'POST';
     const headers = {
       ...OmniLogicAuth.jsonHeader,
       ...OmniLogicAuth.apiHeader,
@@ -24,16 +24,16 @@ export class OmniLogicAuth {
 
     const body = JSON.stringify({ email: email, password: password });
     const options = { method, body, headers };
-    const request = new Request(OmniLogicAuth.baseURL + "login", options);
+    const request = new Request(OmniLogicAuth.baseURL + 'login', options);
     return this.sendRequest(request);
   }
 
   async refreshToken(token: Token): Promise<Token | Error> {
     if (token.refreshToken == null || token.token == null) {
-      return new Error("Attempted to refresh without refresh token");
+      return new Error('Attempted to refresh without refresh token');
     }
 
-    const method = "POST";
+    const method = 'POST';
     const headers = {
       ...OmniLogicAuth.jsonHeader,
       ...OmniLogicAuth.apiHeader,
@@ -42,7 +42,7 @@ export class OmniLogicAuth {
 
     const body = JSON.stringify({ refreshToken: token.refreshToken });
     const options = { method, body, headers };
-    const request = new Request(OmniLogicAuth.baseURL + "refresh", options);
+    const request = new Request(OmniLogicAuth.baseURL + 'refresh', options);
     return this.sendRequest(request);
   }
 
@@ -54,12 +54,12 @@ export class OmniLogicAuth {
       }
       return await response.json();
     } catch (error: unknown) {
-      if (typeof error === "string") {
+      if (typeof error === 'string') {
         return new Error(error);
       } else if (error instanceof Error) {
         return error;
       } else {
-        return new Error("unknown error");
+        return new Error('unknown error');
       }
     }
   }

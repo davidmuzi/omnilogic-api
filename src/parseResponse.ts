@@ -85,7 +85,7 @@ export function parseTelemetryData({ STATUS: status }: { STATUS: any }): StatusR
 export function parseMSPList(response: any): MSPListResponse {
   const parameters = ensureArray(response.Response.Parameters.Parameter);
   const list = ensureArray(parameters[2].Item);
-  
+
   return {
     status: parseInt(parameters[0]['#text']),
     statusMessage: parameters[1]['#text'],
@@ -94,7 +94,7 @@ export function parseMSPList(response: any): MSPListResponse {
       backyardName: item.Property[1]['#text'],
       address: item.Property[2]['#text'],
       messageVersion: item.Property[3]['#text'],
-      needShowPopupMessage: item.Property[4]['#text'].toLowerCase() === 'true'
-    }))
+      needShowPopupMessage: item.Property[4]['#text'].toLowerCase() === 'true',
+    })),
   };
 }
