@@ -12,6 +12,7 @@ import { jwtDecode } from 'jwt-decode';
 interface OmniLogicAPI {
   getPumps(): Promise<Pump[]>;
   getPumpSpeed(pump: Pump): Promise<number>;
+  setPumpOn(pump: Pump): Promise<boolean>;
   setPumpSpeed(pump: Pump, speed: number): Promise<boolean>;
 
   getWaterTemperature(): Promise<WaterTemperature>;
@@ -34,6 +35,7 @@ class OmniLogic implements OmniLogicAPI {
   private auth: OmniLogicAuth;
   private systemID: number | null = null;
   private refreshInterval: NodeJS.Timeout | null = null;
+  private equipmentPoolMap: Map<number, number> = new Map();
 
   private constructor(auth: OmniLogicAuth) {
     this.auth = auth;
@@ -134,13 +136,17 @@ class OmniLogic implements OmniLogicAPI {
       throw new Error('unable to get pump status');
     }
 
-    const pumpSpeed = filters.find(f => f.systemId === pump.systemId)?.filterSpeed;
+    const filter = filters.find(f => f.systemId === pump.systemId);
 
-    if (!pumpSpeed) {
+    if (!filter) {
       throw new Error('unable to get pump speed');
     }
 
-    return pumpSpeed;
+    return filter.filterSpeed;
+  }
+
+  async setPumpOn(pump: Pump): Promise<boolean> {
+    return this.setEquipmentState(pump.systemId, pump.lastSpeed);
   }
 
   async setPumpSpeed(pump: Pump, speed: number): Promise<boolean> {
@@ -162,6 +168,15 @@ class OmniLogic implements OmniLogicAPI {
       throw new Error('Target temperature must be between 40 and 105 degrees Fahrenheit');
     }
 
+    if (!this.equipmentPoolMap.has(heater.systemId)) {
+      await this.updateEquipmentBodyMap();
+    }
+
+    const poolId = this.equipmentPoolMap.get(heater.systemId);
+    if (!poolId) {
+      throw new Error(`Could not find body of water for equipment ${heater.systemId}`);
+    }
+
     const payload = {
       Request: {
         Name: 'SetUIHeaterCmd',
@@ -169,7 +184,7 @@ class OmniLogic implements OmniLogicAPI {
           Parameter: [
             this.tokenTag(),
             this.systemTag(),
-            this.poolIdTag(),
+            this.tag('PoolID', poolId),
             this.tag('HeaterID', heater.systemId),
             this.tag('Temp', targetTemperature),
           ],
@@ -183,6 +198,15 @@ class OmniLogic implements OmniLogicAPI {
   async setHeaterState(heater: Heater, on: boolean): Promise<boolean> {
     const isOn = on === true ? 'true' : 'false';
 
+    if (!this.equipmentPoolMap.has(heater.systemId)) {
+      await this.updateEquipmentBodyMap();
+    }
+
+    const poolId = this.equipmentPoolMap.get(heater.systemId);
+    if (!poolId) {
+      throw new Error(`Could not find body of water for equipment ${heater.systemId}`);
+    }
+
     const payload = {
       Request: {
         Name: 'SetHeaterEnable',
@@ -190,7 +214,7 @@ class OmniLogic implements OmniLogicAPI {
           Parameter: [
             this.tokenTag(),
             this.systemTag(),
-            this.poolIdTag(),
+            this.tag('PoolID', poolId),
             this.tag('HeaterID', heater.systemId),
             this.tag('Enabled', isOn),
             ...this.emptyTimerTag(),
@@ -203,23 +227,22 @@ class OmniLogic implements OmniLogicAPI {
   }
 
   async getWaterTemperature(): Promise<WaterTemperature> {
-    const { bodiesOfWater, virtualHeaters, heaters } = await this.requestTelemetryData();
+    const { bodiesOfWater, virtualHeaters, heaters, filters } = await this.requestTelemetryData();
 
     if (!bodiesOfWater || bodiesOfWater.length === 0) {
-      throw new Error('unable to get water temperature');
+      throw new Error('unable to get bodies of water');
     }
 
-    for (let i = 0; i < bodiesOfWater.length; i++) {
-      if (bodiesOfWater[i].waterTemp > 0) {
-        return {
-          current: bodiesOfWater[i].waterTemp,
-          target: virtualHeaters[i].currentSetPoint,
-          heaterOn: heaters[i].heaterState === 1,
-        };
-      }
+    const index = filters.findIndex(f => f.filterSpeed > 0);
+    if (index === -1) {
+      throw new Error('no pump running');
     }
 
-    throw new Error('unable to get water temperature');
+    return {
+      current: bodiesOfWater[index].waterTemp,
+      target: virtualHeaters[index].currentSetPoint,
+      heaterOn: heaters[index].heaterState === 1,
+    };
   }
 
   // Lights
@@ -240,6 +263,16 @@ class OmniLogic implements OmniLogicAPI {
   }
 
   protected async setEquipmentState(equipmentId: number, value: number): Promise<boolean> {
+    // If we don't have the mapping yet, update it
+    if (!this.equipmentPoolMap.has(equipmentId)) {
+      await this.updateEquipmentBodyMap();
+    }
+
+    const poolId = this.equipmentPoolMap.get(equipmentId);
+    if (!poolId) {
+      throw new Error(`Could not find body of water for equipment ${equipmentId}`);
+    }
+
     const payload = {
       Request: {
         Name: 'SetUIEquipmentCmd',
@@ -247,7 +280,7 @@ class OmniLogic implements OmniLogicAPI {
           Parameter: [
             this.tokenTag(),
             this.systemTag(),
-            this.poolIdTag(),
+            this.tag('PoolID', poolId),
             this.tag('EquipmentId', equipmentId),
             this.tag('IsOn', value),
             ...this.emptyTimerTag(),
@@ -293,10 +326,6 @@ class OmniLogic implements OmniLogicAPI {
     return this.tag('MspSystemID', this.systemID);
   }
 
-  protected poolIdTag() {
-    return this.tag('PoolID', 1 /* 2 for spa?*/);
-  }
-
   protected userTag() {
     if (!this.userID) {
       throw new Error('No user ID available');
@@ -338,6 +367,24 @@ class OmniLogic implements OmniLogicAPI {
       this.tag('Recurring', false),
     ];
   }
+
+  protected async updateEquipmentBodyMap() {
+    const { bodiesOfWater, filters, virtualHeaters, heaters, colorLogicLights } =
+      await this.requestTelemetryData();
+
+    // Reset the map
+    this.equipmentPoolMap.clear();
+
+    // Map each piece of equipment to its body of water
+    for (let i = 0; i < bodiesOfWater.length; i++) {
+      const bodyId = bodiesOfWater[i].systemId;
+
+      if (filters[i]) this.equipmentPoolMap.set(filters[i].systemId, bodyId);
+      if (virtualHeaters[i]) this.equipmentPoolMap.set(virtualHeaters[i].systemId, bodyId);
+      if (heaters[i]) this.equipmentPoolMap.set(heaters[i].systemId, bodyId);
+      if (colorLogicLights[i]) this.equipmentPoolMap.set(colorLogicLights[i].systemId, bodyId);
+    }
+  }
 }
 
 type WaterTemperature = {
@@ -345,5 +392,10 @@ type WaterTemperature = {
   target: Farhenheit;
   heaterOn: boolean;
 };
+
+interface Equipment {
+  systemId: number;
+  poolId: number;
+}
 
 export default OmniLogic;
