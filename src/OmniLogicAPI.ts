@@ -147,26 +147,7 @@ class OmniLogic implements OmniLogicAPI {
     if (speed < 0 || speed > 100) {
       throw new Error('Speed is a percentage, should be between 0 and 100');
     }
-
-    const payload = {
-      Request: {
-        Name: 'SetUIEquipmentCmd',
-        Parameters: {
-          Parameter: [
-            this.tokenTag(),
-            this.systemTag(),
-            this.poolIdTag(),
-            this.tag('EquipmentId', pump.systemId),
-            this.tag('IsOn', speed),
-            ...this.emptyTimerTag(),
-          ],
-        },
-      },
-    };
-
-    const data = await sendRequest(payload);
-    // TODO: create a response object for this
-    return data?.Response?.Parameters?.Parameter[1]?.['#text'] === 'Successful';
+    return this.setEquipmentState(pump.systemId, speed);
   }
 
   // Heaters
@@ -255,8 +236,10 @@ class OmniLogic implements OmniLogicAPI {
   }
 
   async setLightState(light: Light, on: boolean): Promise<boolean> {
-    const isOn = on === true ? 1 : 0;
+    return this.setEquipmentState(light.systemId, on ? 1 : 0);
+  }
 
+  protected async setEquipmentState(equipmentId: number, value: number): Promise<boolean> {
     const payload = {
       Request: {
         Name: 'SetUIEquipmentCmd',
@@ -265,8 +248,8 @@ class OmniLogic implements OmniLogicAPI {
             this.tokenTag(),
             this.systemTag(),
             this.poolIdTag(),
-            this.tag('EquipmentId', light.systemId),
-            this.tag('IsOn', isOn),
+            this.tag('EquipmentId', equipmentId),
+            this.tag('IsOn', value),
             ...this.emptyTimerTag(),
           ],
         },
