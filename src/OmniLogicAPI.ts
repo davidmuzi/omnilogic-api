@@ -2,10 +2,27 @@ import { StatusResponse } from './Response.js';
 import { sendRequest } from './sendRequest.js';
 import { parseTelemetryData, parseMSPList } from './parseResponse.js';
 import { OmniLogicAuth, type Token } from './Authentication.js';
-import type { ColorLogicLightStatus as Light } from './Response.js';
+import type { ColorLogicLightStatus as Light, FilterStatus as Pump, VirtualHeaterStatus as Heater } from './Response.js';
 import { jwtDecode } from 'jwt-decode';
 
-class OmniLogic {
+interface OmniLogicAPI {
+  getPumps(): Promise<Pump[]>;
+  setPumpSpeed(pump: Pump, speed: number): Promise<boolean>;
+  
+  getWaterTemperature(): Promise<WaterTemperature>;
+
+  getHeaters(): Promise<Heater[]>;
+  setHeaterTemperature(heater: Heater, targetTemperature: Farhenheit): Promise<boolean>;
+  setHeaterState(heater: Heater, on: boolean): Promise<boolean>;
+  
+  getLights(): Promise<Light[]>
+  getLightState(light: Light): Promise<boolean>;
+  setLightState(light: Light, on: boolean): Promise<boolean>;
+}
+
+type Farhenheit = number;
+
+class OmniLogic implements OmniLogicAPI {
   private auth: OmniLogicAuth;
   private token: Token | null = null;
   private userID: number | null = null;
@@ -100,6 +117,13 @@ class OmniLogic {
     this.systemID = mspList.list[0].mspSystemId;
   }
 
+  // Pumps
+
+  async getPumps(): Promise<Pump[]> {
+    const { filters } = await this.requestTelemetryData();
+    return filters;
+  }
+
   async getPumpSpeed(): Promise<number> {
     const { filters } = await this.requestTelemetryData();
 
@@ -116,20 +140,110 @@ class OmniLogic {
     throw new Error('unable to get pump speed');
   }
 
-  async getWaterTemperature(): Promise<number> {
-    const { bodiesOfWater } = await this.requestTelemetryData();
+  async setPumpSpeed(pump: Pump, speed: number): Promise<boolean> {
+    if (speed < 0 || speed > 100) {
+      throw new Error("Speed is a percentage, should be between 0 and 100");
+    }
+
+    const payload = {
+      Request: {
+        Name: "SetUIEquipmentCmd",
+        Parameters: {
+          Parameter: [
+            this.tokenTag(),
+            this.systemTag(),
+            this.poolIdTag(),
+            this.tag("EquipmentId", pump.systemId),
+            this.tag("IsOn", speed),
+            ...this.emptyTimerTag(),
+          ],
+        },
+      },
+    };
+
+    const data = await sendRequest(payload);
+    // TODO: create a response object for this
+    return data?.Response?.Parameters?.Parameter[1]?.['#text'] === 'Successful';
+  }
+
+  // Heaters
+
+  async getHeaters(): Promise<Heater[]> {
+    const { virtualHeaters } = await this.requestTelemetryData();
+    return virtualHeaters;
+  }
+
+  async setHeaterTemperature(heater: Heater, targetTemperature: Farhenheit): Promise<boolean> {
+    if (targetTemperature < 50 || targetTemperature > 105) {
+      throw new Error("Target temperature must be between 40 and 105 degrees Fahrenheit");
+    }
+
+    const payload = {
+      Request: {
+        Name: "SetUIHeaterCmd",
+        Parameters: {
+          Parameter: [
+            this.tokenTag(),
+            this.systemTag(),
+            this.poolIdTag(),
+            this.tag("HeaterID", heater.systemId),
+            this.tag("Temp", targetTemperature),
+          ],
+        },
+      },
+    };
+    const data = await sendRequest(payload);
+    return data?.Response?.Parameters?.Parameter[1]?.['#text'] === 'Successful';
+  }
+
+  async setHeaterState(heater: Heater, on: boolean): Promise<boolean> {
+    const isOn = on === true ? "true" : "false";
+
+    const payload = {
+      Request: {
+        Name: 'SetHeaterEnable',
+        Parameters: {
+          Parameter: [
+            this.tokenTag(),
+            this.systemTag(),
+            this.poolIdTag(),
+            this.tag('HeaterID', heater.systemId),
+            this.tag('Enabled', isOn),
+            ...this.emptyTimerTag(),
+          ],
+        },
+      },
+    };
+    const data = await sendRequest(payload);
+    return data?.Response?.Parameters?.Parameter[1]?.['#text'] === 'Successful';
+  }
+
+
+  async getWaterTemperature(): Promise<WaterTemperature> {
+    const { bodiesOfWater, virtualHeaters, heaters } = await this.requestTelemetryData();
 
     if (!bodiesOfWater || bodiesOfWater.length === 0) {
       throw new Error('unable to get water temperature');
     }
 
-    for (const body of bodiesOfWater) {
-      if (body.waterTemp > 0) {
-        return body.waterTemp;
+    for (let i = 0; i < bodiesOfWater.length; i++) {
+      if (bodiesOfWater[i].waterTemp > 0) {
+        return {
+          current: bodiesOfWater[i].waterTemp,
+          target: virtualHeaters[i].currentSetPoint,
+          heaterOn: heaters[i].heaterState === 1
+        }
       }
     }
 
     throw new Error('unable to get water temperature');
+  }
+
+  // Lights
+
+  async getLights(): Promise<Light[]> {
+    const { colorLogicLights } = await this.requestTelemetryData();
+    return colorLogicLights;
   }
 
   async getLightState(light: Light): Promise<boolean> {
@@ -157,8 +271,6 @@ class OmniLogic {
       },
     };
     const data = await sendRequest(payload);
-
-    // TODO: create a response object for this
     return data?.Response?.Parameters?.Parameter[1]?.['#text'] === 'Successful';
   }
 
@@ -241,6 +353,12 @@ class OmniLogic {
       this.tag('Recurring', false),
     ];
   }
+}
+
+type WaterTemperature = {
+  current: Farhenheit;
+  target: Farhenheit;
+  heaterOn: boolean;
 }
 
 export default OmniLogic;
