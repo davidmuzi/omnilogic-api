@@ -1,6 +1,6 @@
 import OmniLogic from '../src/index.js';
 import dotenv from 'dotenv';
-import { ColorLogicLightStatus } from '../src/Response.js';
+import { ColorLogicLightStatus, FilterStatus } from '../src/Response.js';
 
 dotenv.config();
 
@@ -32,16 +32,26 @@ describe('OmniLogic', () => {
       specialEffect: 0
     };
 
+    const mockPump: FilterStatus = {
+      systemId: 3,
+      valvePosition: 1,
+      filterSpeed: 0,
+      filterState: 0,
+      whyFilterIsOn: 0,
+      fpOverride: 0,
+      lastSpeed: 0
+    }
+
     it('should successfully get pump speed', async () => {
-        const result = await omniLogic.getPumpSpeed();
+        const result = await omniLogic.getPumpSpeed(mockPump);
         expect(result).toBeGreaterThanOrEqual(50);
         expect(result).toBeLessThanOrEqual(100);
       }, 30000);
 
     it('should successfully get water temperature', async () => {
         const result = await omniLogic.getWaterTemperature();
-        expect(result).toBeGreaterThanOrEqual(55);
-        expect(result).toBeLessThanOrEqual(90);
+        expect(result.current).toBeGreaterThanOrEqual(55);
+        expect(result.current).toBeLessThanOrEqual(90);
     }, 30000);
 
     it('should successfully get light state', async () => {

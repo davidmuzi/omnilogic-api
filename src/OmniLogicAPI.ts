@@ -2,20 +2,25 @@ import { StatusResponse } from './Response.js';
 import { sendRequest } from './sendRequest.js';
 import { parseTelemetryData, parseMSPList } from './parseResponse.js';
 import { OmniLogicAuth, type Token } from './Authentication.js';
-import type { ColorLogicLightStatus as Light, FilterStatus as Pump, VirtualHeaterStatus as Heater } from './Response.js';
+import type {
+  ColorLogicLightStatus as Light,
+  FilterStatus as Pump,
+  VirtualHeaterStatus as Heater,
+} from './Response.js';
 import { jwtDecode } from 'jwt-decode';
 
 interface OmniLogicAPI {
   getPumps(): Promise<Pump[]>;
+  getPumpSpeed(pump: Pump): Promise<number>;
   setPumpSpeed(pump: Pump, speed: number): Promise<boolean>;
-  
+
   getWaterTemperature(): Promise<WaterTemperature>;
 
   getHeaters(): Promise<Heater[]>;
   setHeaterTemperature(heater: Heater, targetTemperature: Farhenheit): Promise<boolean>;
   setHeaterState(heater: Heater, on: boolean): Promise<boolean>;
-  
-  getLights(): Promise<Light[]>
+
+  getLights(): Promise<Light[]>;
   getLightState(light: Light): Promise<boolean>;
   setLightState(light: Light, on: boolean): Promise<boolean>;
 }
@@ -23,9 +28,10 @@ interface OmniLogicAPI {
 type Farhenheit = number;
 
 class OmniLogic implements OmniLogicAPI {
+  public token: Token | null = null;
+  public userID: number | null = null;
+
   private auth: OmniLogicAuth;
-  private token: Token | null = null;
-  private userID: number | null = null;
   private systemID: number | null = null;
   private refreshInterval: NodeJS.Timeout | null = null;
 
@@ -44,7 +50,7 @@ class OmniLogic implements OmniLogicAPI {
     const client = new OmniLogic(auth);
     client.token = result;
     client.userID = result.userID;
-    client.setupTokenRefresh()
+    client.setupTokenRefresh();
 
     return client;
   }
@@ -55,7 +61,7 @@ class OmniLogic implements OmniLogicAPI {
     client.token = token;
     client.userID = userID;
 
-    client.setupTokenRefresh()
+    client.setupTokenRefresh();
 
     return client;
   }
@@ -65,10 +71,7 @@ class OmniLogic implements OmniLogicAPI {
       throw new Error('No valid token available');
     }
 
-    // Clear any existing interval
     this.clearTokenRefresh();
-
-    // Set new interval
     this.refreshInterval = setInterval(() => this.refreshTokenIfNeeded(), 1000 * 60 * 60); // Check every hour
   }
 
@@ -87,7 +90,7 @@ class OmniLogic implements OmniLogicAPI {
     try {
       const decoded = jwtDecode(this.token.token);
       const exp = (decoded as { exp?: number }).exp;
-      
+
       if (!exp) {
         throw new Error('Token does not contain expiration');
       }
@@ -124,37 +127,37 @@ class OmniLogic implements OmniLogicAPI {
     return filters;
   }
 
-  async getPumpSpeed(): Promise<number> {
+  async getPumpSpeed(pump: Pump): Promise<number> {
     const { filters } = await this.requestTelemetryData();
 
     if (!filters || filters.length === 0) {
       throw new Error('unable to get pump status');
     }
 
-    for (const filter of filters) {
-      if (filter.filterSpeed > 0) {
-        return filter.filterSpeed;
-      }
+    const pumpSpeed = filters.find(f => f.systemId === pump.systemId)?.filterSpeed;
+
+    if (!pumpSpeed) {
+      throw new Error('unable to get pump speed');
     }
 
-    throw new Error('unable to get pump speed');
+    return pumpSpeed;
   }
 
   async setPumpSpeed(pump: Pump, speed: number): Promise<boolean> {
     if (speed < 0 || speed > 100) {
-      throw new Error("Speed is a percentage, should be between 0 and 100");
+      throw new Error('Speed is a percentage, should be between 0 and 100');
     }
 
     const payload = {
       Request: {
-        Name: "SetUIEquipmentCmd",
+        Name: 'SetUIEquipmentCmd',
         Parameters: {
           Parameter: [
             this.tokenTag(),
             this.systemTag(),
             this.poolIdTag(),
-            this.tag("EquipmentId", pump.systemId),
-            this.tag("IsOn", speed),
+            this.tag('EquipmentId', pump.systemId),
+            this.tag('IsOn', speed),
             ...this.emptyTimerTag(),
           ],
         },
@@ -175,19 +178,19 @@ class OmniLogic implements OmniLogicAPI {
 
   async setHeaterTemperature(heater: Heater, targetTemperature: Farhenheit): Promise<boolean> {
     if (targetTemperature < 50 || targetTemperature > 105) {
-      throw new Error("Target temperature must be between 40 and 105 degrees Fahrenheit");
+      throw new Error('Target temperature must be between 40 and 105 degrees Fahrenheit');
     }
 
     const payload = {
       Request: {
-        Name: "SetUIHeaterCmd",
+        Name: 'SetUIHeaterCmd',
         Parameters: {
           Parameter: [
             this.tokenTag(),
             this.systemTag(),
             this.poolIdTag(),
-            this.tag("HeaterID", heater.systemId),
-            this.tag("Temp", targetTemperature),
+            this.tag('HeaterID', heater.systemId),
+            this.tag('Temp', targetTemperature),
           ],
         },
       },
@@ -197,7 +200,7 @@ class OmniLogic implements OmniLogicAPI {
   }
 
   async setHeaterState(heater: Heater, on: boolean): Promise<boolean> {
-    const isOn = on === true ? "true" : "false";
+    const isOn = on === true ? 'true' : 'false';
 
     const payload = {
       Request: {
@@ -218,7 +221,6 @@ class OmniLogic implements OmniLogicAPI {
     return data?.Response?.Parameters?.Parameter[1]?.['#text'] === 'Successful';
   }
 
-
   async getWaterTemperature(): Promise<WaterTemperature> {
     const { bodiesOfWater, virtualHeaters, heaters } = await this.requestTelemetryData();
 
@@ -231,8 +233,8 @@ class OmniLogic implements OmniLogicAPI {
         return {
           current: bodiesOfWater[i].waterTemp,
           target: virtualHeaters[i].currentSetPoint,
-          heaterOn: heaters[i].heaterState === 1
-        }
+          heaterOn: heaters[i].heaterState === 1,
+        };
       }
     }
 
@@ -359,6 +361,6 @@ type WaterTemperature = {
   current: Farhenheit;
   target: Farhenheit;
   heaterOn: boolean;
-}
+};
 
 export default OmniLogic;
