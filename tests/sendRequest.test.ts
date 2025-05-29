@@ -1,5 +1,5 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import { sendRequest } from '../src/sendRequest.js';
+import { sendRequest } from '../src/utils/sendRequest.js';
 
 // Mock fetch globally
 const mockFetch = jest.fn() as jest.MockedFunction<typeof fetch>;

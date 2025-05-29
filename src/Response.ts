@@ -105,3 +105,9 @@ export interface MSPItem {
   messageVersion: string;
   needShowPopupMessage: boolean;
 }
+
+export interface CommandResponse {
+  name: string;
+  status: number;
+  statusMessage: string;
+}

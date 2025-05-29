@@ -1,7 +1,19 @@
 import { StatusResponse } from './Response.js';
-import { sendRequest } from './sendRequest.js';
-import { parseTelemetryData, parseMSPList } from './parseResponse.js';
-import { OmniLogicAuth, type Token } from './Authentication.js';
+import { sendRequest } from './utils/sendRequest.js';
+import { parseTelemetryData, parseMSPList, parseCommandData } from './utils/parseResponse.js';
+import { OmniLogicAuth, type Token } from './utils/Authentication.js';
+import {
+  systemTag,
+  tokenTag,
+  userTag,
+  emptyTimerTag,
+  poolTag,
+  tempTag,
+  heaterTag,
+  enabledTag,
+  equipmentIdTag,
+  isOnTag,
+} from './utils/XmlTags.js';
 import type {
   ColorLogicLightStatus as Light,
   FilterStatus as Pump,
@@ -29,29 +41,29 @@ interface OmniLogicAPI {
 type Farhenheit = number;
 
 class OmniLogic implements OmniLogicAPI {
-  public token: Token | null = null;
-  public userID: number | null = null;
+  public token: Token;
+  public userID: number;
 
   private auth: OmniLogicAuth;
   private systemID: number | null = null;
   private refreshInterval: NodeJS.Timeout | null = null;
   private equipmentPoolMap: Map<number, number> = new Map();
 
-  private constructor(auth: OmniLogicAuth) {
+  private constructor(auth: OmniLogicAuth, token: Token, userID: number) {
     this.auth = auth;
+    this.token = token;
+    this.userID = userID;
   }
 
   static async withCredentials(email: string, password: string): Promise<OmniLogic | Error> {
     const auth = new OmniLogicAuth();
-    const result = await auth.login(email, password);
+    const token = await auth.login(email, password);
 
-    if (result instanceof Error) {
-      return result;
+    if (token instanceof Error) {
+      return token;
     }
 
-    const client = new OmniLogic(auth);
-    client.token = result;
-    client.userID = result.userID;
+    const client = new OmniLogic(auth, token, token.userID);
     client.setupTokenRefresh();
 
     return client;
@@ -59,10 +71,7 @@ class OmniLogic implements OmniLogicAPI {
 
   static withToken(token: Token, userID: number): OmniLogic {
     const auth = new OmniLogicAuth();
-    const client = new OmniLogic(auth);
-    client.token = token;
-    client.userID = userID;
-
+    const client = new OmniLogic(auth, token, userID);
     client.setupTokenRefresh();
 
     return client;
@@ -182,17 +191,18 @@ class OmniLogic implements OmniLogicAPI {
         Name: 'SetUIHeaterCmd',
         Parameters: {
           Parameter: [
-            this.tokenTag(),
-            this.systemTag(),
-            this.tag('PoolID', poolId),
-            this.tag('HeaterID', heater.systemId),
-            this.tag('Temp', targetTemperature),
+            tokenTag(this.token.token),
+            systemTag(this.systemID!),
+            poolTag(poolId),
+            heaterTag(heater.systemId),
+            tempTag(targetTemperature),
           ],
         },
       },
     };
     const data = await sendRequest(payload);
-    return data?.Response?.Parameters?.Parameter[1]?.['#text'] === 'Successful';
+    const { status } = parseCommandData(data);
+    return status == 0;
   }
 
   async setHeaterState(heater: Heater, on: boolean): Promise<boolean> {
@@ -212,18 +222,18 @@ class OmniLogic implements OmniLogicAPI {
         Name: 'SetHeaterEnable',
         Parameters: {
           Parameter: [
-            this.tokenTag(),
-            this.systemTag(),
-            this.tag('PoolID', poolId),
-            this.tag('HeaterID', heater.systemId),
-            this.tag('Enabled', isOn),
-            ...this.emptyTimerTag(),
+            tokenTag(this.token.token),
+            systemTag(this.systemID!),
+            poolTag(poolId),
+            heaterTag(heater.systemId),
+            enabledTag(isOn),
           ],
         },
       },
     };
     const data = await sendRequest(payload);
-    return data?.Response?.Parameters?.Parameter[1]?.['#text'] === 'Successful';
+    const { status } = parseCommandData(data);
+    return status == 0;
   }
 
   async getWaterTemperature(): Promise<WaterTemperature> {
@@ -278,18 +288,19 @@ class OmniLogic implements OmniLogicAPI {
         Name: 'SetUIEquipmentCmd',
         Parameters: {
           Parameter: [
-            this.tokenTag(),
-            this.systemTag(),
-            this.tag('PoolID', poolId),
-            this.tag('EquipmentId', equipmentId),
-            this.tag('IsOn', value),
-            ...this.emptyTimerTag(),
+            tokenTag(this.token.token),
+            systemTag(this.systemID!),
+            poolTag(poolId),
+            equipmentIdTag(equipmentId),
+            isOnTag(value),
+            ...emptyTimerTag(),
           ],
         },
       },
     };
     const data = await sendRequest(payload);
-    return data?.Response?.Parameters?.Parameter[1]?.['#text'] === 'Successful';
+    const { status } = parseCommandData(data);
+    return status == 0;
   }
 
   protected async requestTelemetryData(): Promise<StatusResponse> {
@@ -297,7 +308,7 @@ class OmniLogic implements OmniLogicAPI {
       Request: {
         Name: `RequestTelemetryData`,
         Parameters: {
-          Parameter: [this.tokenTag(), this.systemTag()],
+          Parameter: [tokenTag(this.token.token), systemTag(this.systemID!)],
         },
       },
     };
@@ -310,62 +321,12 @@ class OmniLogic implements OmniLogicAPI {
       Request: {
         Name: `GetMspList`,
         Parameters: {
-          Parameter: [this.tokenTag(), this.userTag()],
+          Parameter: [tokenTag(this.token.token), userTag(this.userID)],
         },
       },
     };
     const data = await sendRequest(payload);
     return parseMSPList(data);
-  }
-
-  protected systemTag() {
-    if (!this.systemID) {
-      throw new Error('No telemetry data available');
-    }
-
-    return this.tag('MspSystemID', this.systemID);
-  }
-
-  protected userTag() {
-    if (!this.userID) {
-      throw new Error('No user ID available');
-    }
-    return this.tag('OwnerID', this.userID);
-  }
-
-  protected tokenTag() {
-    if (!this.token) {
-      throw new Error('No valid token available');
-    }
-    return this.tag('token', this.token.token);
-  }
-
-  protected tag<T>(name: string, value: T) {
-    let _dataType: string;
-
-    if (typeof value === 'number') {
-      _dataType = Number.isInteger(value as number) ? 'int' : 'float';
-    } else if (typeof value === 'string') {
-      _dataType = 'string';
-    } else if (typeof value === 'boolean') {
-      _dataType = 'bool';
-    } else {
-      throw new Error(`Unsupported data type: ${typeof value}`);
-    }
-
-    return { '@_name': name, '@_dataType': _dataType, '#text': value };
-  }
-
-  protected emptyTimerTag() {
-    return [
-      this.tag('IsCountDownTimer', false),
-      this.tag('StartTimeHours', 0),
-      this.tag('StartTimeMinutes', 0),
-      this.tag('EndTimeHours', 0),
-      this.tag('EndTimeMinutes', 0),
-      this.tag('DaysActive', 0),
-      this.tag('Recurring', false),
-    ];
   }
 
   protected async updateEquipmentBodyMap() {

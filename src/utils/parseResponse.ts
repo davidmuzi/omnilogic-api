@@ -1,4 +1,4 @@
-import { StatusResponse, MSPListResponse } from './Response';
+import { StatusResponse, MSPListResponse, CommandResponse } from '../Response.js';
 
 function ensureArray<T>(value: T | T[]): T[] {
   return Array.isArray(value) ? value : [value];
@@ -96,5 +96,13 @@ export function parseMSPList(response: any): MSPListResponse {
       messageVersion: item.Property[3]['#text'],
       needShowPopupMessage: item.Property[4]['#text'].toLowerCase() === 'true',
     })),
+  };
+}
+
+export function parseCommandData({ Response: response }: { Response: any }): CommandResponse {
+  return {
+    name: response.Name,
+    status: parseInt(response.Parameters.Parameter[0]['#text']),
+    statusMessage: response.Parameters.Parameter[1]['#text'],
   };
 }

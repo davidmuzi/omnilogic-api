@@ -1,5 +1,5 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import { OmniLogicAuth } from '../src/Authentication.js';
+import { OmniLogicAuth } from '../src/utils/Authentication.js';
 
 // Mock fetch globally
 const mockFetch = jest.fn() as jest.MockedFunction<typeof fetch>;
