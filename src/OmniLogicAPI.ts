@@ -13,7 +13,7 @@ import {
   enabledTag,
   equipmentIdTag,
   isOnTag,
-} from './utils/XmlTags.js';
+} from './utils/xmlTags.js';
 import type {
   ColorLogicLightStatus as Light,
   FilterStatus as Pump,
