@@ -4,7 +4,12 @@ import { ColorLogicLightStatus, FilterStatus } from '../src/Response.js';
 
 dotenv.config();
 
-describe('OmniLogic', () => {
+// Skip all tests in this file if running in CI or missing environment variables
+const runIntegrationTests = process.env.OMNILOGIC_TOKEN && 
+                          process.env.OMNILOGIC_USERID && 
+                          !process.env.CI;
+
+(runIntegrationTests ? describe : describe.skip)('OmniLogic Integration Tests', () => {
   let omniLogic: OmniLogic;
   beforeEach(async () => {
     const token = {
