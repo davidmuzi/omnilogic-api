@@ -128,6 +128,9 @@ class OmniLogic implements OmniLogicAPI {
 
   async connect() {
     const mspList = await this.requestMSPList();
+    if (mspList.list.length === 0) {
+      throw new Error('No MSPs found');
+    }
     this.systemID = mspList.list[0].mspSystemId;
   }
 

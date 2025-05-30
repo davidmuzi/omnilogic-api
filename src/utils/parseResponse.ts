@@ -84,12 +84,17 @@ export function parseTelemetryData({ STATUS: status }: { STATUS: any }): StatusR
 
 export function parseMSPList(response: any): MSPListResponse {
   const parameters = ensureArray(response.Response.Parameters.Parameter);
-  const list = ensureArray(parameters[2].Item);
+
+  if (parameters.length < 2) {
+    throw new Error('Invalid response from MSP list request');
+  }
+
+  const mspList = parameters[2] ? ensureArray(parameters[2].Item): []
 
   return {
     status: parseInt(parameters[0]['#text']),
     statusMessage: parameters[1]['#text'],
-    list: list.map(item => ({
+    list: mspList.map(item => ({
       mspSystemId: parseInt(item.Property[0]['#text']),
       backyardName: item.Property[1]['#text'],
       address: item.Property[2]['#text'],
