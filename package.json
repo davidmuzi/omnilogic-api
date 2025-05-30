@@ -1,9 +1,44 @@
 {
   "name": "omnilogic-api",
-  "version": "1.0.0",
+  "version": "0.0.1",
+  "description": "A TypeScript API client for the Hayward OmniLogic pool control system",
   "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
   "license": "MIT",
+  "author": {
+    "name": "David Muzi",
+    "url": "https://github.com/davidmuzi"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/omnilogic-api.git"
+  },
+  "bugs": {
+    "url": "https://github.com/davidmuzi/omnilogic-api/issues"
+  },
+  "homepage": "https://github.com/davidmuzi/omnilogic-api",
+  "keywords": [
+    "hayward",
+    "omnilogic",
+    "pool",
+    "automation",
+    "api",
+    "typescript"
+  ],
   "scripts": {
     "build": "tsc",
     "start": "npm run build && node dist/index.js",
@@ -12,7 +47,10 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json}\"",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
-    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage"
+    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
+    "prepublishOnly": "npm run test && npm run build",
+    "prepare": "npm run build",
+    "clean": "rm -rf dist"
   },
   "jest": {
     "preset": "ts-jest/presets/default-esm",

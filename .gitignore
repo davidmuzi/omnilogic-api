@@ -32,3 +32,5 @@ coverage/
 
 # Optional eslint cache
 .eslintcache 
+
+todo.md
