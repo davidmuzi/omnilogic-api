@@ -1,4 +1,6 @@
 # OmniLogic API
+[![CI](https://github.com/davidmuzi/omnilogic-api/actions/workflows/node.js.yml/badge.svg)](https://github.com/davidmuzi/omnilogic-api/actions/workflows/node.js.yml)
+
 
 JS Library to control Hayward OmniLogic pool controllers
 
