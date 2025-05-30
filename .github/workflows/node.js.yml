@@ -25,7 +25,14 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-    - run: npm ci
-    - run: npm run build --if-present
-    - run: npm test
+        cache: 'yarn'  # ✅ Change this to cache Yarn dependencies
+
+    - name: Install dependencies with Yarn
+      run: yarn install --frozen-lockfile
+
+    - name: Build project (if applicable)
+      run: yarn build
+
+    - name: Run tests
+      run: yarn test
+      
