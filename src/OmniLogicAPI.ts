@@ -20,25 +20,17 @@ import type {
   VirtualHeaterStatus as Heater,
 } from './Response.js';
 import { jwtDecode } from 'jwt-decode';
+import {
+  ConnectionError,
+  EquipmentError,
+  ValidationError,
+  AuthenticationError,
+} from './errors.js';
+import { OmniLogicAPI, WaterTemperature } from './OmniLogicInterface.js';
 
-interface OmniLogicAPI {
-  getPumps(): Promise<Pump[]>;
-  getPumpSpeed(pump: Pump): Promise<number>;
-  setPumpOn(pump: Pump): Promise<boolean>;
-  setPumpSpeed(pump: Pump, speed: number): Promise<boolean>;
 
-  getWaterTemperature(): Promise<WaterTemperature>;
 
-  getHeaters(): Promise<Heater[]>;
-  setHeaterTemperature(heater: Heater, targetTemperature: Farhenheit): Promise<boolean>;
-  setHeaterState(heater: Heater, on: boolean): Promise<boolean>;
 
-  getLights(): Promise<Light[]>;
-  getLightState(light: Light): Promise<boolean>;
-  setLightState(light: Light, on: boolean): Promise<boolean>;
-}
-
-type Farhenheit = number;
 
 class OmniLogic implements OmniLogicAPI {
   public token: Token;
@@ -88,7 +80,7 @@ class OmniLogic implements OmniLogicAPI {
 
   setupTokenRefresh() {
     if (this.token === null) {
-      throw new Error('No valid token available');
+      throw new AuthenticationError('No valid token available');
     }
 
     this.clearTokenRefresh();
@@ -104,7 +96,7 @@ class OmniLogic implements OmniLogicAPI {
 
   async refreshTokenIfNeeded() {
     if (this.token === null) {
-      throw new Error('No valid token available');
+      throw new AuthenticationError('No valid token available');
     }
 
     try {
@@ -138,7 +130,7 @@ class OmniLogic implements OmniLogicAPI {
   async connect() {
     const mspList = await this.requestMSPList();
     if (mspList.list.length === 0) {
-      throw new Error('No MSPs found');
+      throw new ConnectionError('No MSPs found');
     }
     this.systemID = mspList.list[0].mspSystemId;
   }
@@ -150,7 +142,7 @@ class OmniLogic implements OmniLogicAPI {
     return filters;
   }
 
-  async getPumpSpeed(pump: Pump): Promise<number> {
+  async getPumpSpeed(pump: Pump): Promise<Percentage> {
     const { filters } = await this.requestTelemetryData();
 
     if (!filters || filters.length === 0) {
@@ -170,9 +162,9 @@ class OmniLogic implements OmniLogicAPI {
     return this.setEquipmentState(pump.systemId, pump.lastSpeed);
   }
 
-  async setPumpSpeed(pump: Pump, speed: number): Promise<boolean> {
+  async setPumpSpeed(pump: Pump, speed: Percentage): Promise<boolean> {
     if (speed < 0 || speed > 100) {
-      throw new Error('Speed is a percentage, should be between 0 and 100');
+      throw new ValidationError('Speed is a percentage, should be between 0 and 100');
     }
     return this.setEquipmentState(pump.systemId, speed);
   }
@@ -186,7 +178,7 @@ class OmniLogic implements OmniLogicAPI {
 
   async setHeaterTemperature(heater: Heater, targetTemperature: Farhenheit): Promise<boolean> {
     if (targetTemperature < 50 || targetTemperature > 105) {
-      throw new Error('Target temperature must be between 40 and 105 degrees Fahrenheit');
+      throw new ValidationError('Target temperature must be between 40 and 105 degrees Fahrenheit');
     }
 
     if (!this.equipmentPoolMap.has(heater.systemId)) {
@@ -194,12 +186,12 @@ class OmniLogic implements OmniLogicAPI {
     }
 
     if (!this.systemID) {
-      throw new Error('System ID not set, did you call `connect()`?');
+      throw new ConnectionError();
     }
 
     const poolId = this.equipmentPoolMap.get(heater.systemId);
     if (!poolId) {
-      throw new Error(`Could not find body of water for equipment ${heater.systemId}`);
+      throw new EquipmentError(heater.systemId);
     }
 
     const payload = {
@@ -234,12 +226,12 @@ class OmniLogic implements OmniLogicAPI {
     }
 
     if (!this.systemID) {
-      throw new Error('System ID not set, did you call `connect()`?');
+      throw new ConnectionError();
     }
 
     const poolId = this.equipmentPoolMap.get(heater.systemId);
     if (!poolId) {
-      throw new Error(`Could not find body of water for equipment ${heater.systemId}`);
+      throw new EquipmentError(heater.systemId);
     }
 
     const payload = {
@@ -309,12 +301,12 @@ class OmniLogic implements OmniLogicAPI {
     }
 
     if (!this.systemID) {
-      throw new Error('System ID not set, did you call `connect()`?');
+      throw new ConnectionError();
     }
 
     const poolId = this.equipmentPoolMap.get(equipmentId);
     if (!poolId) {
-      throw new Error(`Could not find body of water for equipment ${equipmentId}`);
+      throw new EquipmentError(equipmentId);
     }
 
     const payload = {
@@ -343,7 +335,7 @@ class OmniLogic implements OmniLogicAPI {
 
   protected async requestTelemetryData(): Promise<StatusResponse> {
     if (!this.systemID) {
-      throw new Error('System ID not set, did you call `connect()`?');
+      throw new ConnectionError();
     }
 
     const now = Date.now();
@@ -417,15 +409,5 @@ class OmniLogic implements OmniLogicAPI {
   }
 }
 
-type WaterTemperature = {
-  current: Farhenheit;
-  target: Farhenheit;
-  heaterOn: boolean;
-};
-
-interface Equipment {
-  systemId: number;
-  poolId: number;
-}
 
 export default OmniLogic;
