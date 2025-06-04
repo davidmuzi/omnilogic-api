@@ -8,8 +8,7 @@ dotenv.config();
 const runIntegrationTests = process.env.OMNILOGIC_TOKEN && 
                           process.env.OMNILOGIC_USERID && 
                           !process.env.CI;
-console.log('runIntegrationTests', process.env.CI);
-describe('OmniLogic Integration Tests', () => {
+(runIntegrationTests ? describe : describe.skip)('OmniLogic Integration Tests', () => {
   let omniLogic: OmniLogic;
   
   const mockLight: ColorLogicLightStatus = { 
