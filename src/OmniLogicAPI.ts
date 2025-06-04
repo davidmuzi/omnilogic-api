@@ -184,6 +184,10 @@ class OmniLogic implements OmniLogicAPI {
       await this.updateEquipmentBodyMap();
     }
 
+    if (!this.systemID) {
+      throw new Error('System ID not set, did you call `connect()`?');
+    }
+
     const poolId = this.equipmentPoolMap.get(heater.systemId);
     if (!poolId) {
       throw new Error(`Could not find body of water for equipment ${heater.systemId}`);
@@ -213,6 +217,10 @@ class OmniLogic implements OmniLogicAPI {
 
     if (!this.equipmentPoolMap.has(heater.systemId)) {
       await this.updateEquipmentBodyMap();
+    }
+
+    if (!this.systemID) {
+      throw new Error('System ID not set, did you call `connect()`?');
     }
 
     const poolId = this.equipmentPoolMap.get(heater.systemId);
@@ -281,6 +289,10 @@ class OmniLogic implements OmniLogicAPI {
       await this.updateEquipmentBodyMap();
     }
 
+    if (!this.systemID) {
+      throw new Error('System ID not set, did you call `connect()`?');
+    }
+
     const poolId = this.equipmentPoolMap.get(equipmentId);
     if (!poolId) {
       throw new Error(`Could not find body of water for equipment ${equipmentId}`);
@@ -292,7 +304,7 @@ class OmniLogic implements OmniLogicAPI {
         Parameters: {
           Parameter: [
             tokenTag(this.token.token),
-            systemTag(this.systemID!),
+            systemTag(this.systemID),
             poolTag(poolId),
             equipmentIdTag(equipmentId),
             isOnTag(value),
@@ -307,11 +319,15 @@ class OmniLogic implements OmniLogicAPI {
   }
 
   protected async requestTelemetryData(): Promise<StatusResponse> {
+    if (!this.systemID) {
+      throw new Error('System ID not set, did you call `connect()`?');
+    }
+
     const payload = {
       Request: {
         Name: `RequestTelemetryData`,
         Parameters: {
-          Parameter: [tokenTag(this.token.token), systemTag(this.systemID!)],
+          Parameter: [tokenTag(this.token.token), systemTag(this.systemID)],
         },
       },
     };

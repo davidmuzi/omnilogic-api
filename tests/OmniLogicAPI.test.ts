@@ -19,14 +19,37 @@ const runIntegrationTests = process.env.OMNILOGIC_TOKEN &&
     const userID = parseInt(process.env.OMNILOGIC_USERID!);
 
     omniLogic = OmniLogic.withToken(token, userID);
-    await omniLogic.connect();
   });
 
   afterEach(() => {
     omniLogic.clearTokenRefresh();
   });
 
+  describe('connection validation', () => {
+    it('should throw error if methods are called before connect', async () => {
+      await expect(omniLogic.getWaterTemperature())
+        .rejects
+        .toThrow('System ID not set, did you call `connect()`?');
+
+      await expect(omniLogic.getPumpSpeed({} as FilterStatus))
+        .rejects
+        .toThrow('System ID not set, did you call `connect()`?');
+
+      await expect(omniLogic.getLightState({} as ColorLogicLightStatus))
+        .rejects
+        .toThrow('System ID not set, did you call `connect()`?');
+    });
+
+    it('should not throw error after connecting', async () => {
+      await omniLogic.connect();
+      await expect(omniLogic.getWaterTemperature()).resolves.not.toThrow();
+    });
+  });
+
   describe('status', () => {
+    beforeEach(async () => {
+      await omniLogic.connect();
+    });
 
     const mockLight: ColorLogicLightStatus = { 
       systemId: 8, 
