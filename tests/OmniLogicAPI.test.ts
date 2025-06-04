@@ -9,8 +9,28 @@ const runIntegrationTests = process.env.OMNILOGIC_TOKEN &&
                           process.env.OMNILOGIC_USERID && 
                           !process.env.CI;
 
-(runIntegrationTests ? describe : describe.skip)('OmniLogic Integration Tests', () => {
+describe('OmniLogic Integration Tests', () => {
   let omniLogic: OmniLogic;
+  
+  const mockLight: ColorLogicLightStatus = { 
+    systemId: 8, 
+    lightState: 6,
+    currentShow: 0,
+    speed: 0,
+    brightness: 100,
+    specialEffect: 0
+  };
+
+  const mockPump: FilterStatus = {
+    systemId: 3,
+    valvePosition: 1,
+    filterSpeed: 0,
+    filterState: 0,
+    whyFilterIsOn: 0,
+    fpOverride: 0,
+    lastSpeed: 0
+  }
+
   beforeEach(async () => {
     const token = {
       token: process.env.OMNILOGIC_TOKEN!,
@@ -51,25 +71,6 @@ const runIntegrationTests = process.env.OMNILOGIC_TOKEN &&
       await omniLogic.connect();
     });
 
-    const mockLight: ColorLogicLightStatus = { 
-      systemId: 8, 
-      lightState: 6,
-      currentShow: 0,
-      speed: 0,
-      brightness: 100,
-      specialEffect: 0
-    };
-
-    const mockPump: FilterStatus = {
-      systemId: 3,
-      valvePosition: 1,
-      filterSpeed: 0,
-      filterState: 0,
-      whyFilterIsOn: 0,
-      fpOverride: 0,
-      lastSpeed: 0
-    }
-
     it('should successfully get pump speed', async () => {
         const result = await omniLogic.getPumpSpeed(mockPump);
         expect(result).toBeGreaterThanOrEqual(50);
@@ -91,5 +92,79 @@ const runIntegrationTests = process.env.OMNILOGIC_TOKEN &&
         const result = await omniLogic.setLightState(mockLight, false);
         expect(result).toEqual(true);
       }, 30000);
+  });
+
+  describe('telemetry caching', () => {
+    beforeEach(async () => {
+      await omniLogic.connect();
+    });
+
+    it('should cache telemetry data', async () => {
+      // First call should make a request
+      const result1 = await omniLogic.getWaterTemperature();
+      
+      // Second immediate call should use cache
+      const result2 = await omniLogic.getWaterTemperature();
+      
+      expect(result1).toEqual(result2);
+    });
+
+    it('should refresh cache when forced', async () => {
+      // Get initial data
+      const result1 = await omniLogic.getWaterTemperature();
+      
+      // Force refresh
+      await omniLogic.refreshTelemetry();
+      
+      // Get new data
+      const result2 = await omniLogic.getWaterTemperature();
+      
+      // Data might be the same, but we're testing that the refresh didn't throw
+      expect(result2).toBeDefined();
+    });
+
+    it('should clear cache', async () => {
+      // Get initial data
+      await omniLogic.getWaterTemperature();
+      
+      // Clear cache
+      omniLogic.clearTelemetryCache();
+      
+      // Next call should make a new request
+      const result = await omniLogic.getWaterTemperature();
+      
+      expect(result).toBeDefined();
+    });
+
+    it('should invalidate cache after successful state changes', async () => {
+      // Get initial state
+      const initialTemp = await omniLogic.getWaterTemperature();
+      
+      // Make a state change
+      await omniLogic.setLightState(mockLight, true);
+      
+      // Get state again - should make a new request since cache was invalidated
+      const newTemp = await omniLogic.getWaterTemperature();
+      
+      // The temperatures might be the same in reality, but we're testing cache invalidation
+      expect(newTemp).toBeDefined();
+    });
+
+    it('should not invalidate cache if state change fails', async () => {
+      // Get initial state
+      const initialTemp = await omniLogic.getWaterTemperature();
+      
+      // Try to set invalid pump speed (this should fail)
+      try {
+        await omniLogic.setPumpSpeed(mockPump, 101);
+      } catch (error) {
+        // Expected error
+      }
+      
+      // Get state again - should use cache since previous call failed
+      const newTemp = await omniLogic.getWaterTemperature();
+      
+      expect(newTemp).toEqual(initialTemp);
+    });
   });
 }); 

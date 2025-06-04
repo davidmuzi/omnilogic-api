@@ -48,11 +48,20 @@ class OmniLogic implements OmniLogicAPI {
   private systemID: number | null = null;
   private refreshInterval: NodeJS.Timeout | null = null;
   private equipmentPoolMap: Map<number, number> = new Map();
+  
+  // Cache related properties
+  private telemetryCache: StatusResponse | null = null;
+  private lastTelemetryFetch: number = 0;
+  private readonly cacheValiditySeconds: number;
 
   private constructor(auth: OmniLogicAuth, token: Token, userID: number) {
     this.auth = auth;
     this.token = token;
     this.userID = userID;
+    
+    // Get cache validity from environment variable or use default
+    const envCacheValidity = process.env.OMNILOGIC_CACHE_SECONDS;
+    this.cacheValiditySeconds = envCacheValidity ? parseInt(envCacheValidity) : 30;
   }
 
   static async withCredentials(email: string, password: string): Promise<OmniLogic | Error> {
@@ -209,6 +218,11 @@ class OmniLogic implements OmniLogicAPI {
     };
     const data = await sendRequest(payload);
     const { status } = parseCommandData(data);
+
+    if (status == 0) {
+      this.clearTelemetryCache();
+    }
+
     return status == 0;
   }
 
@@ -244,6 +258,11 @@ class OmniLogic implements OmniLogicAPI {
     };
     const data = await sendRequest(payload);
     const { status } = parseCommandData(data);
+
+    if (status == 0) {
+      this.clearTelemetryCache();
+    }
+
     return status == 0;
   }
 
@@ -315,12 +334,24 @@ class OmniLogic implements OmniLogicAPI {
     };
     const data = await sendRequest(payload);
     const { status } = parseCommandData(data);
-    return status == 0;
+    const success = status == 0;
+    if (success) {
+      this.clearTelemetryCache();
+    }
+    return success;
   }
 
   protected async requestTelemetryData(): Promise<StatusResponse> {
     if (!this.systemID) {
       throw new Error('System ID not set, did you call `connect()`?');
+    }
+
+    const now = Date.now();
+    const cacheAge = (now - this.lastTelemetryFetch) / 1000; // Convert to seconds
+
+    // Return cached data if it's still valid
+    if (this.telemetryCache && cacheAge < this.cacheValiditySeconds) {
+      return this.telemetryCache;
     }
 
     const payload = {
@@ -331,8 +362,15 @@ class OmniLogic implements OmniLogicAPI {
         },
       },
     };
+    
     const data = await sendRequest(payload);
-    return parseTelemetryData(data);
+    const response = parseTelemetryData(data);
+    
+    // Update cache
+    this.telemetryCache = response;
+    this.lastTelemetryFetch = now;
+    
+    return response;
   }
 
   protected async requestMSPList() {
@@ -364,6 +402,18 @@ class OmniLogic implements OmniLogicAPI {
       if (heaters[i]) this.equipmentPoolMap.set(heaters[i].systemId, bodyId);
       if (colorLogicLights[i]) this.equipmentPoolMap.set(colorLogicLights[i].systemId, bodyId);
     }
+  }
+
+  // Add method to clear cache
+  public clearTelemetryCache(): void {
+    this.telemetryCache = null;
+    this.lastTelemetryFetch = 0;
+  }
+
+  // Add method to force refresh telemetry
+  public async refreshTelemetry(): Promise<StatusResponse> {
+    this.clearTelemetryCache();
+    return this.requestTelemetryData();
   }
 }
 
