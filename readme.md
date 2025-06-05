@@ -4,7 +4,7 @@
 
 JS Library to control Hayward OmniLogic pool controllers
 
-## Using the api
+## Using the API
 
 ```ts
 const omniLogic = await OmniLogic.withCredentials("email@login.com", "p4ssw0rd");

@@ -140,7 +140,7 @@ const runIntegrationTests = process.env.OMNILOGIC_TOKEN &&
       const initialTemp = await omniLogic.getWaterTemperature();
       
       // Make a state change
-      await omniLogic.setLightState(mockLight, true);
+      await omniLogic.setLightState(mockLight, false);
       
       // Get state again - should make a new request since cache was invalidated
       const newTemp = await omniLogic.getWaterTemperature();

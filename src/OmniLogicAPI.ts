@@ -26,7 +26,7 @@ import {
   ValidationError,
   AuthenticationError,
 } from './errors.js';
-import { OmniLogicAPI, WaterTemperature } from './OmniLogicInterface.js';
+import { Farhenheit, OmniLogicAPI, Percentage, WaterTemperature } from './OmniLogicInterface.js';
 
 
 
