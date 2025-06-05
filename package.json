@@ -35,9 +35,7 @@
     "hayward",
     "omnilogic",
     "pool",
-    "automation",
-    "api",
-    "typescript"
+    "automation"
   ],
   "scripts": {
     "build": "tsc",
