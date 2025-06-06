@@ -89,7 +89,7 @@ export function parseMSPList(response: any): MSPListResponse {
     throw new Error('Invalid response from MSP list request');
   }
 
-  const mspList = parameters[2] ? ensureArray(parameters[2].Item): []
+  const mspList = parameters[2] ? ensureArray(parameters[2].Item) : [];
 
   return {
     status: parseInt(parameters[0]['#text']),

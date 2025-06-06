@@ -25,12 +25,8 @@ import {
   EquipmentError,
   ValidationError,
   AuthenticationError,
-} from './errors.js';
+} from './utils/errors.js';
 import { Farhenheit, OmniLogicAPI, Percentage, WaterTemperature } from './OmniLogicInterface.js';
-
-
-
-
 
 class OmniLogic implements OmniLogicAPI {
   public token: Token;
@@ -40,7 +36,7 @@ class OmniLogic implements OmniLogicAPI {
   private systemID: number | null = null;
   private refreshInterval: NodeJS.Timeout | null = null;
   private equipmentPoolMap: Map<number, number> = new Map();
-  
+
   // Cache related properties
   private telemetryCache: StatusResponse | null = null;
   private lastTelemetryFetch: number = 0;
@@ -50,18 +46,18 @@ class OmniLogic implements OmniLogicAPI {
     this.auth = auth;
     this.token = token;
     this.userID = userID;
-    
+
     // Get cache validity from environment variable or use default
     const envCacheValidity = process.env.OMNILOGIC_CACHE_SECONDS;
     this.cacheValiditySeconds = envCacheValidity ? parseInt(envCacheValidity) : 30;
   }
 
-  static async withCredentials(email: string, password: string): Promise<OmniLogic | Error> {
+  static async withCredentials(email: string, password: string): Promise<OmniLogic> {
     const auth = new OmniLogicAuth();
     const token = await auth.login(email, password);
 
     if (token instanceof Error) {
-      return token;
+      throw new AuthenticationError(token.message);
     }
 
     const client = new OmniLogic(auth, token, token.userID);
@@ -104,7 +100,7 @@ class OmniLogic implements OmniLogicAPI {
       const exp = (decoded as { exp?: number }).exp;
 
       if (!exp) {
-        throw new Error('Token does not contain expiration');
+        throw new AuthenticationError('Token does not contain expiration');
       }
 
       const expiresAt = exp * 1000; // Convert to milliseconds
@@ -116,7 +112,7 @@ class OmniLogic implements OmniLogicAPI {
         console.log('Token close to expiring, refreshing...');
         const newToken = await this.auth.refreshToken(this.token);
         if (newToken instanceof Error) {
-          throw new Error('Failed to refresh token');
+          throw new AuthenticationError('Failed to refresh token');
         }
         this.token = newToken;
         console.log('Token refreshed');
@@ -146,13 +142,13 @@ class OmniLogic implements OmniLogicAPI {
     const { filters } = await this.requestTelemetryData();
 
     if (!filters || filters.length === 0) {
-      throw new Error('unable to get pump status');
+      throw new EquipmentError('no pumps found');
     }
 
     const filter = filters.find(f => f.systemId === pump.systemId);
 
     if (!filter) {
-      throw new Error('unable to get pump speed');
+      throw new EquipmentError('unable to get pump speed');
     }
 
     return filter.filterSpeed;
@@ -186,12 +182,12 @@ class OmniLogic implements OmniLogicAPI {
     }
 
     if (!this.systemID) {
-      throw new ConnectionError();
+      throw new ConnectionError('System ID not set, did you call `connect()`?');
     }
 
     const poolId = this.equipmentPoolMap.get(heater.systemId);
     if (!poolId) {
-      throw new EquipmentError(heater.systemId);
+      throw new EquipmentError(`Could not find equipment ${heater.systemId}`);
     }
 
     const payload = {
@@ -226,12 +222,12 @@ class OmniLogic implements OmniLogicAPI {
     }
 
     if (!this.systemID) {
-      throw new ConnectionError();
+      throw new ConnectionError('System ID not set, did you call `connect()`?');
     }
 
     const poolId = this.equipmentPoolMap.get(heater.systemId);
     if (!poolId) {
-      throw new EquipmentError(heater.systemId);
+      throw new EquipmentError(`Could not find equipment ${heater.systemId}`);
     }
 
     const payload = {
@@ -262,12 +258,12 @@ class OmniLogic implements OmniLogicAPI {
     const { bodiesOfWater, virtualHeaters, heaters, filters } = await this.requestTelemetryData();
 
     if (!bodiesOfWater || bodiesOfWater.length === 0) {
-      throw new Error('unable to get bodies of water');
+      throw new Error('unable to get bodies of water'); // TODO: this should be a connection error
     }
 
     const index = filters.findIndex(f => f.filterSpeed > 0);
     if (index === -1) {
-      throw new Error('no pump running');
+      throw new Error('no pump running'); // TODO: this should be a connection error
     }
 
     return {
@@ -291,7 +287,7 @@ class OmniLogic implements OmniLogicAPI {
   }
 
   async setLightState(light: Light, on: boolean): Promise<boolean> {
-    return this.setEquipmentState(light.systemId, on ? 1 : 0);
+    return await this.setEquipmentState(light.systemId, on ? 1 : 0);
   }
 
   protected async setEquipmentState(equipmentId: number, value: number): Promise<boolean> {
@@ -301,12 +297,12 @@ class OmniLogic implements OmniLogicAPI {
     }
 
     if (!this.systemID) {
-      throw new ConnectionError();
+      throw new ConnectionError('System ID not set, did you call `connect()`?');
     }
 
     const poolId = this.equipmentPoolMap.get(equipmentId);
     if (!poolId) {
-      throw new EquipmentError(equipmentId);
+      throw new EquipmentError(`Could not find equipment ${equipmentId}`);
     }
 
     const payload = {
@@ -335,7 +331,7 @@ class OmniLogic implements OmniLogicAPI {
 
   protected async requestTelemetryData(): Promise<StatusResponse> {
     if (!this.systemID) {
-      throw new ConnectionError();
+      throw new ConnectionError('System ID not set, did you call `connect()`?');
     }
 
     const now = Date.now();
@@ -354,14 +350,14 @@ class OmniLogic implements OmniLogicAPI {
         },
       },
     };
-    
+
     const data = await sendRequest(payload);
     const response = parseTelemetryData(data);
-    
+
     // Update cache
     this.telemetryCache = response;
     this.lastTelemetryFetch = now;
-    
+
     return response;
   }
 
@@ -408,6 +404,5 @@ class OmniLogic implements OmniLogicAPI {
     return this.requestTelemetryData();
   }
 }
-
 
 export default OmniLogic;

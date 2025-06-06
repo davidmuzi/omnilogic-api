@@ -1,3 +1,5 @@
+import { AuthenticationError } from './errors.js';
+
 export type Token = {
   token: string;
   refreshToken: string;
@@ -15,7 +17,7 @@ export class OmniLogicAuth {
   private static jsonHeader = { 'Content-Type': 'application/json' };
   private static apiHeader = { 'X-Hayward-App-Id': '6jf6n7jt9fqqe9qkbutaqajl2i' };
 
-  async login(email: string, password: string): Promise<Session | Error> {
+  async login(email: string, password: string): Promise<Session> {
     const method = 'POST';
     const headers = {
       ...OmniLogicAuth.jsonHeader,
@@ -28,9 +30,9 @@ export class OmniLogicAuth {
     return this.sendRequest(request);
   }
 
-  async refreshToken(token: Token): Promise<Token | Error> {
+  async refreshToken(token: Token): Promise<Token> {
     if (token.refreshToken == null || token.token == null) {
-      return new Error('Attempted to refresh without refresh token');
+      throw new AuthenticationError('Attempted to refresh without refresh token');
     }
 
     const method = 'POST';
@@ -46,20 +48,21 @@ export class OmniLogicAuth {
     return this.sendRequest(request);
   }
 
-  protected async sendRequest<T>(request: Request): Promise<T | Error> {
+  protected async sendRequest<T>(request: Request): Promise<T> {
     try {
       const response = await fetch(request);
-      if (!response.ok) {
-        return new Error(`HTTP error! status: ${response.status}`);
+      if (!response || !response.ok) {
+        const status = response?.status || 'undefined';
+        throw new AuthenticationError(`HTTP error! status: ${status}`);
       }
       return await response.json();
     } catch (error: unknown) {
       if (typeof error === 'string') {
-        return new Error(error);
+        throw new AuthenticationError(error);
       } else if (error instanceof Error) {
-        return error;
+        throw error;
       } else {
-        return new Error('unknown error');
+        throw new AuthenticationError('unknown error');
       }
     }
   }

@@ -1,5 +1,6 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import { OmniLogicAuth } from '../src/utils/Authentication.js';
+import { AuthenticationError, OmniLogicError } from '../src/index.js';
 
 // Mock fetch globally
 const mockFetch = jest.fn() as jest.MockedFunction<typeof fetch>;
@@ -54,11 +55,9 @@ describe('OmniLogicAuth', () => {
     it('should handle network errors during login', async () => {
       const mockError = new Error('Network error');
       mockFetch.mockRejectedValueOnce(mockError);
-
-      const result = await auth.login(mockEmail, mockPassword);
-      
-      expect(result).toBeInstanceOf(Error);
-      expect((result as Error).message).toBe('Network error');
+      await expect(auth.login(mockEmail, mockPassword))
+        .rejects
+        .toThrow(mockError);
     });
   });
 
@@ -101,20 +100,18 @@ describe('OmniLogicAuth', () => {
     });
 
     it('should handle missing refresh token', async () => {
-      const result = await auth.refreshToken({ token: 'token', refreshToken: null as any });
-      
-      expect(result).toBeInstanceOf(Error);
-      expect((result as Error).message).toBe('Attempted to refresh without refresh token');
+      const token = { token: 'token', refreshToken: null as any }
+      await expect(auth.refreshToken(token))
+        .rejects
+        .toThrow(AuthenticationError);
     });
 
     it('should handle network errors during refresh', async () => {
       const mockError = new Error('Network error');
-      mockFetch.mockRejectedValueOnce(mockError);
-
-      const result = await auth.refreshToken(mockToken);
-      
-      expect(result).toBeInstanceOf(Error);
-      expect((result as Error).message).toBe('Network error');
+      mockFetch.mockRejectedValueOnce(mockError);      
+      await expect(auth.refreshToken(mockToken))
+        .rejects
+        .toThrow(mockError);
     });
   });
 
@@ -122,21 +119,19 @@ describe('OmniLogicAuth', () => {
     it('should handle string errors', async () => {
       mockFetch.mockRejectedValueOnce('String error message');
 
-      const request = new Request('https://example.com');
-      const result = await auth['sendRequest'](request);
-      
-      expect(result).toBeInstanceOf(Error);
-      expect((result as Error).message).toBe('String error message');
+      const request = new Request('https://example.com');      
+      await expect(auth['sendRequest'](request))
+        .rejects
+        .toThrow(AuthenticationError);
     });
 
     it('should handle unknown errors', async () => {
       mockFetch.mockRejectedValueOnce(null);
 
       const request = new Request('https://example.com');
-      const result = await auth['sendRequest'](request);
-      
-      expect(result).toBeInstanceOf(Error);
-      expect((result as Error).message).toBe('unknown error');
+      await expect(auth['sendRequest'](request))
+        .rejects
+        .toThrow(AuthenticationError);
     });
   });
 }); 

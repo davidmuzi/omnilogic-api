@@ -4,6 +4,10 @@
 
 JS Library to control Hayward OmniLogic pool controllers
 
+## Requirements
+- Hayward OmniLogic control system
+- Node v18+ runtime
+
 ## Using the API
 
 ```ts
@@ -17,7 +21,7 @@ const pumpSpeed = await omniLogic.getPumpSpeed(pumps[0]);
 console.log(pumpSpeed);
 
 // Get water temperature
-onst { current, target, heaterOn } = await omniLogic.getWaterTemperature();
+const { current, target, heaterOn } = await omniLogic.getWaterTemperature();
 console.log(`Current temp: ${current} °F, Target: ${target} °F, Heater is ${ heaterOn ? 'on' : 'off'}`);
 
 // Turn lights on
