@@ -8,8 +8,12 @@ JS Library to control Hayward OmniLogic pool controllers
 - Hayward OmniLogic control system
 - Node v18+ runtime
 
-## Using the API
+## Installation
+`npm install @davidmuzi/omnilogic-api`
+or
+`yarn add @davidmuzi/omnilogic-api`
 
+## Using the API
 ```ts
 const omniLogic = await OmniLogic.withCredentials("email@login.com", "p4ssw0rd");
 
