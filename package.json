@@ -1,6 +1,6 @@
 {
-  "name": "@davidmuzi/omnilogic-api",
-  "version": "0.0.1",
+  "name": "omnilogic-api",
+  "version": "0.0.2",
   "description": "A TypeScript API client for the Hayward OmniLogic pool control system",
   "main": "dist/index.js",
   "module": "dist/index.js",

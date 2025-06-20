@@ -138,14 +138,19 @@ class OmniLogic implements OmniLogicAPI {
     return filters;
   }
 
-  async getPumpSpeed(pump: Pump): Promise<Percentage> {
+  async getPumpSpeed(pump: Pump): Promise<Percentage>
+  async getPumpSpeed(systemId: number): Promise<Percentage>
+  async getPumpSpeed(pumpOrId: Pump | number): Promise<Percentage> 
+  {
+    const systemId = typeof pumpOrId === 'number' ? pumpOrId : pumpOrId.systemId;
+
     const { filters } = await this.requestTelemetryData();
 
     if (!filters || filters.length === 0) {
       throw new EquipmentError('no pumps found');
     }
 
-    const filter = filters.find(f => f.systemId === pump.systemId);
+    const filter = filters.find(f => f.systemId === systemId);
 
     if (!filter) {
       throw new EquipmentError('unable to get pump speed');
@@ -158,11 +163,14 @@ class OmniLogic implements OmniLogicAPI {
     return this.setEquipmentState(pump.systemId, pump.lastSpeed);
   }
 
-  async setPumpSpeed(pump: Pump, speed: Percentage): Promise<boolean> {
+  async setPumpSpeed(systemId: number, speed: number): Promise<boolean>
+  async setPumpSpeed(pump: Pump, speed: Percentage): Promise<boolean>
+  async setPumpSpeed(pumpOrId: Pump | number, speed: number): Promise<boolean> {
+    const systemId = typeof pumpOrId === 'number' ? pumpOrId : pumpOrId.systemId;
     if (speed < 0 || speed > 100) {
       throw new ValidationError('Speed is a percentage, should be between 0 and 100');
     }
-    return this.setEquipmentState(pump.systemId, speed);
+    return this.setEquipmentState(systemId, speed);
   }
 
   // Heaters
@@ -172,12 +180,16 @@ class OmniLogic implements OmniLogicAPI {
     return virtualHeaters;
   }
 
-  async setHeaterTemperature(heater: Heater, targetTemperature: Farhenheit): Promise<boolean> {
+  async setHeaterTemperature(heater: Heater, targetTemperature: Farhenheit): Promise<boolean>;
+  async setHeaterTemperature(systemId: number, targetTemperature: Farhenheit): Promise<boolean>;
+  async setHeaterTemperature(heaterOrId: Heater | number, targetTemperature: Farhenheit): Promise<boolean> {
+    const systemId = typeof heaterOrId === 'number' ? heaterOrId : heaterOrId.systemId;
+
     if (targetTemperature < 50 || targetTemperature > 105) {
       throw new ValidationError('Target temperature must be between 40 and 105 degrees Fahrenheit');
     }
 
-    if (!this.equipmentPoolMap.has(heater.systemId)) {
+    if (!this.equipmentPoolMap.has(systemId)) {
       await this.updateEquipmentBodyMap();
     }
 
@@ -185,9 +197,9 @@ class OmniLogic implements OmniLogicAPI {
       throw new ConnectionError('System ID not set, did you call `connect()`?');
     }
 
-    const poolId = this.equipmentPoolMap.get(heater.systemId);
+    const poolId = this.equipmentPoolMap.get(systemId);
     if (!poolId) {
-      throw new EquipmentError(`Could not find equipment ${heater.systemId}`);
+      throw new EquipmentError(`Could not find equipment ${systemId}`);
     }
 
     const payload = {
@@ -198,7 +210,7 @@ class OmniLogic implements OmniLogicAPI {
             tokenTag(this.token.token),
             systemTag(this.systemID!),
             poolTag(poolId),
-            heaterTag(heater.systemId),
+            heaterTag(systemId),
             tempTag(targetTemperature),
           ],
         },
@@ -214,10 +226,13 @@ class OmniLogic implements OmniLogicAPI {
     return status == 0;
   }
 
-  async setHeaterState(heater: Heater, on: boolean): Promise<boolean> {
+  async setHeaterState(heater: Heater, on: boolean): Promise<boolean>;
+  async setHeaterState(systemId: number, on: boolean): Promise<boolean>;
+  async setHeaterState(heaterOrId: Heater | number, on: boolean): Promise<boolean> {
+    const systemId = typeof heaterOrId === 'number' ? heaterOrId : heaterOrId.systemId;
     const isOn = on === true ? 'true' : 'false';
 
-    if (!this.equipmentPoolMap.has(heater.systemId)) {
+    if (!this.equipmentPoolMap.has(systemId)) {
       await this.updateEquipmentBodyMap();
     }
 
@@ -225,9 +240,9 @@ class OmniLogic implements OmniLogicAPI {
       throw new ConnectionError('System ID not set, did you call `connect()`?');
     }
 
-    const poolId = this.equipmentPoolMap.get(heater.systemId);
+    const poolId = this.equipmentPoolMap.get(systemId);
     if (!poolId) {
-      throw new EquipmentError(`Could not find equipment ${heater.systemId}`);
+      throw new EquipmentError(`Could not find equipment ${systemId}`);
     }
 
     const payload = {
@@ -238,7 +253,7 @@ class OmniLogic implements OmniLogicAPI {
             tokenTag(this.token.token),
             systemTag(this.systemID!),
             poolTag(poolId),
-            heaterTag(heater.systemId),
+            heaterTag(systemId),
             enabledTag(isOn),
           ],
         },
@@ -280,14 +295,20 @@ class OmniLogic implements OmniLogicAPI {
     return colorLogicLights;
   }
 
-  async getLightState(light: Light): Promise<boolean> {
+  async getLightState(light: Light): Promise<boolean>;
+  async getLightState(systemId: number): Promise<boolean>;
+  async getLightState(lightOrId: Light | number): Promise<boolean> {
     const { colorLogicLights } = await this.requestTelemetryData();
+    const systemId = typeof lightOrId === 'number' ? lightOrId : lightOrId.systemId;
     // 0: off, 4: powering on, 6: on 7: powering off,
-    return colorLogicLights.filter(l => l.systemId == light.systemId)[0]?.lightState == 6;
+    return colorLogicLights.filter(l => l.systemId == systemId)[0]?.lightState == 6;
   }
 
-  async setLightState(light: Light, on: boolean): Promise<boolean> {
-    return await this.setEquipmentState(light.systemId, on ? 1 : 0);
+  async setLightState(light: Light, on: boolean): Promise<boolean>
+  async setLightState(systemId: number, on: boolean): Promise<boolean>
+  async setLightState(lightOrId: Light | number, on: boolean): Promise<boolean> {
+    const systemId = typeof lightOrId === 'number' ? lightOrId : lightOrId.systemId;
+    return await this.setEquipmentState(systemId, on ? 1 : 0);
   }
 
   protected async setEquipmentState(equipmentId: number, value: number): Promise<boolean> {
