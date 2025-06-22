@@ -5,11 +5,11 @@
   "main": "index.js",
   "license": "MIT",
   "dependencies": {
-    "omnilogic-api": "https://github.com/davidmuzi/omnilogic-api.git"
+    "@davidmuzi/omnilogic-api": "file:../"
   },
   "scripts": {
     "errors": "tsx src/errors.ts",
-    "simple": "node src/example.js",
+    "simple": "node src/simple.js",
     "complex": "tsx src/complex.ts"
   },
   "devDependencies": {
