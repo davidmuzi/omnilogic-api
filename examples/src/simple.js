@@ -1,4 +1,4 @@
-import OmniLogic from "omnilogic-api";
+import OmniLogic from "@davidmuzi/omnilogic-api";
 
 // Create a new OmniLogic instance with login credentials
 const omniLogic = await OmniLogic.withCredentials("email", "p4ssw0rd");

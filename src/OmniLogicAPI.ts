@@ -52,6 +52,20 @@ class OmniLogic implements OmniLogicAPI {
     this.cacheValiditySeconds = envCacheValidity ? parseInt(envCacheValidity) : 30;
   }
 
+  /**
+   * Creates a new OmniLogic instance using email and password credentials.
+   * 
+   * @param email - The email address used for authentication
+   * @param password - The password for the account
+   * @returns Promise<OmniLogic> - A configured OmniLogic instance
+   * @throws {AuthenticationError} When authentication fails due to invalid credentials
+   * 
+   * @example
+   * ```typescript
+   * const omniLogic = await OmniLogic.withCredentials("user@example.com", "password123");
+   * await omniLogic.connect();
+   * ```
+   */
   static async withCredentials(email: string, password: string): Promise<OmniLogic> {
     const auth = new OmniLogicAuth();
     const token = await auth.login(email, password);
@@ -66,6 +80,27 @@ class OmniLogic implements OmniLogicAPI {
     return client;
   }
 
+  /**
+   * Creates a new OmniLogic instance using an existing token and user ID.
+   * This method is useful when you have already authenticated and want to
+   * reuse the token for subsequent connections.
+   * 
+   * @param token - The authentication token obtained from a previous login
+   * @param userID - The user ID associated with the token
+   * @returns OmniLogic - A configured OmniLogic instance
+   * 
+   * @example
+   * ```typescript
+   * // First authenticate to get token and userID
+   * const omniLogic = await OmniLogic.withCredentials("user@example.com", "password123");
+   * await omniLogic.connect();
+   * const { token, userID } = omniLogic;
+   * 
+   * // Later, use the token to create a new instance
+   * const omniLogic2 = OmniLogic.withToken(token, userID);
+   * await omniLogic2.connect();
+   * ```
+   */
   static withToken(token: Token, userID: number): OmniLogic {
     const auth = new OmniLogicAuth();
     const client = new OmniLogic(auth, token, userID);
@@ -74,7 +109,7 @@ class OmniLogic implements OmniLogicAPI {
     return client;
   }
 
-  setupTokenRefresh() {
+  private setupTokenRefresh() {
     if (this.token === null) {
       throw new AuthenticationError('No valid token available');
     }
@@ -83,14 +118,14 @@ class OmniLogic implements OmniLogicAPI {
     this.refreshInterval = setInterval(() => this.refreshTokenIfNeeded(), 1000 * 60 * 60); // Check every hour
   }
 
-  clearTokenRefresh() {
+  private clearTokenRefresh() {
     if (this.refreshInterval) {
       clearInterval(this.refreshInterval);
       this.refreshInterval = null;
     }
   }
 
-  async refreshTokenIfNeeded() {
+  private async refreshTokenIfNeeded() {
     if (this.token === null) {
       throw new AuthenticationError('No valid token available');
     }
@@ -123,6 +158,13 @@ class OmniLogic implements OmniLogicAPI {
     }
   }
 
+  /**
+   * Connects to the OmniLogic system and sets up the system ID.
+   * This method must be called before any other API operations.
+   * 
+   * @throws {ConnectionError} When no MSPs are found in the system
+   * @returns {Promise<void>} Resolves when connection is established`
+   */
   async connect() {
     const mspList = await this.requestMSPList();
     if (mspList.list.length === 0) {

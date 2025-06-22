@@ -1,4 +1,4 @@
-import OmniLogic, { AuthenticationError, ValidationError, ConnectionError, EquipmentError } from "omnilogic-api";
+import OmniLogic, { AuthenticationError, ValidationError, ConnectionError, EquipmentError } from "@davidmuzi/omnilogic-api";
 
 try {
     // Bad credentials will throw an AuthenticationError

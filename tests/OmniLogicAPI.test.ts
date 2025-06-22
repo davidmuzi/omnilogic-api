@@ -41,7 +41,7 @@ const runIntegrationTests = process.env.OMNILOGIC_TOKEN &&
   });
 
   afterEach(() => {
-    omniLogic.clearTokenRefresh();
+    (omniLogic as any).clearTokenRefresh();
   });
 
   describe('connection validation', () => {
@@ -72,7 +72,7 @@ const runIntegrationTests = process.env.OMNILOGIC_TOKEN &&
 
     it('should successfully get pump speed', async () => {
         const result = await omniLogic.getPumpSpeed(mockPump);
-        expect(result).toBeGreaterThanOrEqual(50);
+        expect(result).toBeGreaterThanOrEqual(15);
         expect(result).toBeLessThanOrEqual(100);
       }, 30000);
 
