@@ -1,0 +1,19 @@
+{
+  "name": "pool-examples",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "omnilogic-api": "https://github.com/davidmuzi/omnilogic-api.git"
+  },
+  "scripts": {
+    "errors": "tsx src/errors.ts",
+    "simple": "node src/example.js",
+    "complex": "tsx src/complex.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.3",
+    "tsx": "^4.20.3"
+  }
+}

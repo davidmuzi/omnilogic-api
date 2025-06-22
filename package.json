@@ -1,6 +1,6 @@
 {
-  "name": "omnilogic-api",
-  "version": "0.0.2",
+  "name": "@davidmuzi/omnilogic-api",
+  "version": "0.0.3",
   "description": "A TypeScript API client for the Hayward OmniLogic pool control system",
   "main": "dist/index.js",
   "module": "dist/index.js",
@@ -25,7 +25,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/omnilogic-api.git"
+    "url": "git+https://github.com/davidmuzi/omnilogic-api.git"
   },
   "bugs": {
     "url": "https://github.com/davidmuzi/omnilogic-api/issues"
